@@ -1,0 +1,176 @@
+---
+title: "Fast Food Restaurant"
+author: "H.A.A.G."
+date: "2025-06-24"
+output: html_document
+---
+
+# Visualización de datos en el proyecto de curso Tidyverse
+
+## Importando librerias y datos
+
+```{r message=FALSE, warning=FALSE}
+#Importando librerias
+library(readr)
+library(dplyr)
+library(skimr)
+library(here)
+library(ggplot2)
+library(ggrepel)
+library(directlabels)
+library(stringr)
+library(viridis)
+```
+
+```{r message=FALSE, warning=FALSE}
+#Importando datos
+cal <- read_csv(here("data","otra_data","fastfood_calories.csv"))
+
+sales <- read_csv(here("data","otra_data","fastfood_sales.csv"))
+```
+
+## Revisando los datos
+
+```{r}
+skim(cal)
+```
+
+```{r}
+skim(sales)
+```
+
+## Gráfico 1
+
+```{r}
+sales <- sales %>%
+  mutate(proportion = num_franchised_stores/unit_count)
+
+us_sales <- ggplot(sales, aes(us_sales, unit_count, color = proportion, 
+    label = restaurant)) +
+  geom_text_repel(color = "black", size = 3) + 
+  geom_point() +
+  scale_y_continuous(trans = "log10") + 
+  scale_x_continuous(trans = "log10") +
+  labs(y = "Total number of stores (log10 scale)",
+    x = "U.S. sales in millions (log10 scale)",
+  color = "Proportion of stores\nfranchised") + 
+  theme_bw() +
+  theme(axis.title = element_text(size = 8, face = "bold"),
+    legend.title = element_text(size = 10, face = "bold"))
+
+us_sales 
+```
+
+## Gráfico 2
+
+```{r}
+us_bar <- sales %>% 
+  ggplot(aes(x = reorder(restaurant, average_sales), y = average_sales)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(x = "Restaurant",
+    y = "Average sales per unit store (in thousands)") +
+  scale_y_continuous(labels = scales::label_dollar()) +
+  geom_dl(aes(label=paste("$", average_sales, sep = ""), size = 0.5), 
+    method= c(list("last.points"),
+    cex = 0.5)) +
+  theme_classic() +
+  theme(axis.title = element_text(size = 8, face = "bold"))
+
+us_bar  
+```
+
+## Gráfico 3
+
+```{r}
+salt <- cal %>%
+  ggplot(aes(x = calories, y = sodium, label = item)) + 
+  geom_point() +
+  facet_wrap(~restaurant) +
+  geom_text_repel(data = subset(cal, sodium >= 2300), size = 1,
+    nudge_y = 1, nudge_x = 3,
+    max.overlaps = Inf) +
+  geom_hline(yintercept = 2300) + 
+  labs(x = "Calories", y = "Sodium (mg)") +
+  theme_bw() +
+  theme(axis.title = element_text(size = 8, face = "bold"))
+
+salt
+```
+
+## Gráfico 4
+
+```{r}
+cal$is_salad <- str_detect(cal$item, "Salad")
+
+order <- cal %>% 
+  group_by(restaurant) %>%
+  summarise(med = median(calories)) %>%
+  arrange(med)
+
+order
+```
+
+```{r}
+medians <- order$restaurant
+
+medians
+```
+```{r}
+boxes <- cal %>%
+  ggplot(aes(factor(x = restaurant, level = medians), 
+    y = calories)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_point(position = "jitter", aes(color = factor(is_salad))) +
+  scale_y_continuous(trans = "log10") +
+  coord_flip() +
+  labs(x = "Restaurant", 
+    y = "Calories (log10 scale)",
+    color = "Is the entree\na salad?") +
+  scale_color_discrete(labels = c("Not a salad", "Salad")) +
+  theme_bw() +
+  theme(axis.title = element_text(size = 10, face = "bold"),
+    legend.title = element_text(size = 10, face = "bold"))
+
+boxes
+```
+
+## Gráfico 5
+
+```{r}
+cal2 <- cal %>%
+ group_by(restaurant) %>%
+ filter(!any(restaurant == "Taco Bell"))
+
+cal2
+```
+
+```{r}
+mediansugar <- cal2 %>%
+  group_by(restaurant) %>%
+  summarize(medsugar = median(sugar)) 
+
+mediansugar
+```
+
+```{r}
+join <-inner_join(sales, mediansugar, by = "restaurant")
+
+joinedplot <- join %>%
+  ggplot(aes(x= reorder(restaurant, us_sales), y = us_sales,
+    fill = medsugar)) +
+  geom_bar(stat= "identity") +
+    labs(x = "Restaurant", 
+    y = "U.S. sales (in millions)") +
+  scale_fill_viridis(option = "D", 
+    name = "Median sugar (grams)\nin fast food entrees") +
+  theme_classic() +
+  theme(axis.title = element_text(size = 10, face = "bold"),
+    legend.title = element_text(size = 10, face = "bold"))
+
+joinedplot 
+```
+
+
+
+
